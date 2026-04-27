@@ -1,0 +1,78 @@
+import sys 
+from collections import OrderedDict   
+
+class MapReduce:     
+    def __init__(self):         
+        self.intermediate = OrderedDict()         
+        self.result = []      
+        
+    def emitIntermediate(self, key, value):         
+        self.intermediate.setdefault(key, [])         
+        self.intermediate[key].append(value)       
+        
+    def emit(self, value):         
+        # value[0] is row index, value[1] is col index, value[2] is the sum
+        self.result[value[0]][value[1]] = value[2]       
+        
+    def execute(self, matrix1, matrix2, mapper, reducer):         
+        n = len(matrix1)         
+        m = len(matrix2[0])         
+        for i in xrange(0, n):             
+            self.result.append([0] * m)          
+            
+        mapper(matrix1, matrix2)          
+        
+        for key in self.intermediate:             
+            reducer(key, self.intermediate[key])          
+            
+        for i in xrange(0, n):             
+            row = ""             
+            for j in xrange(0, m):                 
+                row += str(self.result[i][j]) + " "             
+            print(row.strip())  
+
+mapReducer = None  
+
+def mapper(matrix1, matrix2):     
+    # Rows of A, Cols of B
+    n = len(matrix1)
+    m = len(matrix2[0])
+    # Inner dimension
+    k = len(matrix2)
+    
+    for i in range(n):
+        for j in range(m):
+            for l in range(k):
+                # Send the product to the cell (i, j)
+                mapReducer.emitIntermediate((i, j), matrix1[i][l] * matrix2[l][j])
+
+def reducer(key, list_of_values):     
+    # Sum all products for this specific cell
+    total = sum(list_of_values)
+    mapReducer.emit([key[0], key[1], total])  
+
+if __name__ == '__main__':     
+    # Python 2 compatibility
+    testcases_input = sys.stdin.readline().strip()
+    if testcases_input:
+        testcases = int(testcases_input)
+        for _ in xrange(testcases):         
+            mapReducer = MapReduce()         
+            
+            # Read Matrix 1
+            line = sys.stdin.readline().strip().split()
+            if not line: break
+            row1, col1 = int(line[0]), int(line[1])
+            matrix1 = []         
+            for i in range(row1):             
+                matrix1.append([int(x) for x in sys.stdin.readline().split()])
+            
+            # Read Matrix 2
+            line = sys.stdin.readline().strip().split()
+            row2, col2 = int(line[0]), int(line[1])
+            matrix2 = []                  
+            for i in range(row2):             
+                matrix2.append([int(x) for x in sys.stdin.readline().split()])
+            
+            # Execute must be OUTSIDE the row-reading loop
+            mapReducer.execute(matrix1, matrix2, mapper, reducer)
