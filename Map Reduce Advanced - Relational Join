@@ -1,0 +1,72 @@
+import sys
+from collections import OrderedDict
+
+class MapReduce:
+    def __init__(self):
+        self.intermediate = OrderedDict()
+        self.result = []
+
+    def emitIntermediate(self, key, value):
+        self.intermediate.setdefault(key, [])       
+        self.intermediate[key].append(value)
+
+    def emit(self, value):
+        self.result.append(value) 
+
+    def execute(self, data, mapper, reducer):
+        # 1. Map Phase
+        for record in data:
+            mapper(record)
+
+        # 2. Reduce Phase
+        # Sorting keys ensures consistent processing order
+        for key in sorted(self.intermediate.keys()):
+            reducer(key, self.intermediate[key])
+
+        # 3. Output Phase
+        self.result.sort()
+        for item in self.result:
+            # .format() ensures compatibility across Python versions
+            print("{0}".format(item))
+
+mapReducer = MapReduce()
+
+def mapper(record):
+    # Split record by comma and clean whitespace
+    parts = [p.strip() for p in record.split(',')]
+    if not parts or len(parts) < 3:
+        return
+
+    # Check the record type (first column)
+    if parts[0] == 'Department':
+        # Format: Department, ID, Name
+        dept_id = parts[1]
+        dept_name = parts[2]
+        mapReducer.emitIntermediate(dept_id, ('Dept', dept_name))
+        
+    elif parts[0] == 'Employee':
+        # Format: Employee, Name, ID
+        emp_name = parts[1]
+        dept_id = parts[2]
+        mapReducer.emitIntermediate(dept_id, ('Emp', emp_name))
+
+def reducer(key, list_of_values):
+    # Separate names and departments for this specific ID
+    employees = [v[1] for v in list_of_values if v[0] == 'Emp']
+    departments = [v[1] for v in list_of_values if v[0] == 'Dept']
+    
+    # Perform a relational join: pair every employee with every department
+    for emp in employees:
+        for dept in departments:
+            # Emit tuple matching Sample Output: ('ID', 'Name', 'Department')
+            mapReducer.emit((key, emp, dept))
+
+if __name__ == '__main__':
+    inputData = []
+    # Reads from standard input (stdin) until EOF
+    for line in sys.stdin:
+        if line.strip():
+            inputData.append(line.strip())
+    
+    # Run the MapReduce job
+    mapReducer.execute(inputData, mapper, reducer)
